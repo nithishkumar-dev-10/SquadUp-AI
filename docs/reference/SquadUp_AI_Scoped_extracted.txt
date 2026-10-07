@@ -1,0 +1,313 @@
+--- PAGE 1 ---
+SquadUp AI  |  Nithish Kumar S  |  2026
+Page 1
+SquadUp AI
+AI-Powered Team and Player Matching for Grassroots Sports
+Volleyball and Cricket at launch | Coimbatore first, then Tamil Nadu
+Project Submission | Author: Nithish Kumar S | Year: 2026
+1. Problem Statement
+Almost every village and town in Tamil Nadu fields its own volleyball and cricket teams, often several per town
+under different organisations. These teams are shrinking. Senior players retire with no replacements, and
+players move to other cities for work and can no longer turn up regularly.
+This creates two problems that today are solved only by phone calls and WhatsApp forwards:
+  Teams short by 2-3 players cannot fill a match, and often cannot register for a tournament at all.
+ Players whose whole team has dissolved have nowhere to go and no reliable way to find a guest slot.
+The talent and the vacancies both exist, but they never meet. WhatsApp posts vanish within a day, nothing can
+be filtered by role or experience, nobody can tell who is reliable, and information only reaches people already in
+the right group. The result is forfeited entries, players quitting the sport, and rural talent that stays invisible.
+Existing tool
+What it does
+What it misses
+WhatsApp groups
+Quick calls for players
+Posts vanish, no search, no role filter, no reliability record
+CricHeroes
+Cricket scoring and community
+Cricket only, scoring-focused, weak on village vacancy
+matching
+Playo / Hudle
+Venue and game booking
+Urban and booking-focused, not built for team vacancies
+Word of mouth
+Personal network
+Slow, limited to one person's circle
+2. Our Solution
+SquadUp is a mobile-first web app (Tamil and English) that works as a two-way marketplace with a trust layer.
+Teams register and post vacancies, players build profiles and mark themselves available, and both sides find
+each other in a live directory. Consistency is proven through GPS check-ins confirmed by the captain, and a
+calendar heat map. Tournaments are published on a shared board so every team hears about them.
+Design rule: the normal app (the core) decides what is allowed and what is true. The AI layer only
+understands, ranks, explains and drafts. If the AI is unavailable, the app still works.
+One account for everyone. Every user is a player and every feature is open to every player. Anyone can
+create a team, post a vacancy, invite players or publish a tournament. Team actions such as editing a roster or
+confirming attendance are limited to the owner and managers of that team. Admin approval only adds a Verified
+Organiser badge to tournaments.
+Core features (no AI)
+  Phone OTP login, team and roster management, vacancy board with status tracking
+ Player profile with availability, travel radius and privacy controls (phone hidden until both sides accept)
+ Looking for a team option: a player marks themselves as permanent, guest or tournament-only and appears
+in the Players Available directory
+ Two-way matching by filters (role, area, date, slot) with notifications to both sides
+ Invites, requests, accept / decline / counter, guest slot booking, in-app chat
+ Tournament board (info only), ground directory, district leaderboards, admin moderation
+
+--- PAGE 2 ---
+SquadUp AI  |  Nithish Kumar S  |  2026
+Page 2
+ Trust layer: check-in with GPS near a known ground, captain-confirmed attendance, two-way ratings, a
+formula-based reliability score, rule-based fraud checks and a calendar heat map
+AI layer on top
+Category
+Count
+Features
+Machine Learning
+0
+None
+Deep Learning (transformers
+only)
+1
+Tanglish Vacancy Parser
+Generative AI (Gemini)
+6
+Vic (Orchestration Agent, text + voice), AI Matcher, Auto-drafted
+Invites, Translation, Rules and Umpire Assistant, Tournament
+Recommender
+Vic is the single chat front door (text first, voice through a mic button). It reaches all 5 other GenAI features and
+the core as tools.
+Pipeline: Text post -> Vacancy Parser (transformer) -> structured vacancy -> core filters shortlist -> Gemini
+ranks and explains -> captain approves -> invites sent -> match played -> captain confirms attendance -> heat
+map and reliability updated.
+3. Deep Learning Component
+Deep Learning is kept minimal and uses a transformer model only. It does one job that a normal rule or an API
+call cannot do well.
+3.1. Tanglish / Tamil Vacancy Parser (flagship)
+Type
+Deep Learning - fine-tuned transformer (intent detection + slot extraction)
+What it solves
+Village captains do not want to fill an 8-field form. They type the way they speak, mixing Tamil
+and English in English letters (Tanglish), with spelling that changes from person to person.
+Normal keyword rules break on this. The parser turns one messy line into a clean structured
+vacancy, so the captain only taps confirm.
+Example
+Captain types: "sunday morning peelamedu 2 spikers 1 setter venum"
+Parser output:
+  Intent = post_vacancy
+  Vacancy 1: role = spiker, count = 2
+  Vacancy 2: role = setter, count = 1
+  Date = next Sunday, time = morning, place = Peelamedu, urgency = normal
+The vacancy form is filled automatically. The same model also spots "setter, Saravanampatti,
+weekends, looking for a team" as a looking_for_team post and fills a player availability profile.
+How it works
+ Data: generate 2-3k synthetic Tanglish posts with Gemini, hand-correct about 300, and use
+these as the gold set
+ Model: fine-tune a multilingual Indian-language transformer (MuRIL or IndicBERT) with two
+heads: an intent classifier (post_vacancy, looking_for_team, other) and a token tagger for
+slots (role, count, date, time, place, urgency)
+ Post-processing: normalise roles to fixed labels, resolve relative dates such as "sunday",
+and match place names to the ground directory despite spelling variations
+ Evaluation: intent accuracy and per-slot F1 on a held-out set
+ Serving: FastAPI endpoint POST /parse/post, with confidence score. If confidence is low, the
+form opens pre-filled for manual fixing
+
+--- PAGE 3 ---
+SquadUp AI  |  Nithish Kumar S  |  2026
+Page 3
+Tech stack
+PyTorch, Hugging Face Transformers, MuRIL / IndicBERT, FastAPI, Pydantic (output schema),
+Gemini API (synthetic data generation only)
+4. Generative AI Components
+All Generative AI features are powered by the Gemini API. Every call uses a Pydantic schema for structured
+output, and Gemini never invents data: it only works on records returned by the core.
+4.1. Vic - Conversational Orchestration Agent (Text + Voice)
+Type
+Generative AI - LangGraph agent with Gemini function calling; text is primary, voice is an
+optional mic button
+What it solves
+The app has many features (parser, matcher, invites, translation, rules, tournaments). Finding
+the right screen and filling forms is a barrier for village users. Vic is one chat that can reach
+every other feature. The user says what they want in one sentence, by typing or by tapping the
+mic, and Vic runs the right steps and asks for approval before anything is sent.
+Example
+Captain (typed or spoken): "We are short a wicketkeeper for the 15th"
+1. Vic calls parse_vacancy (transformer) and gets role = wicketkeeper, count = 1, date = 15th
+2. Calls search_players and finds 14 eligible players
+3. Calls rank_candidates (AI Matcher) and gets the top 3 with reasons
+4. Shows: "Here are 3 players. Send invites?"
+5. Captain taps yes and send_invite runs.
+Player: "Find me a volleyball team near Saravanampatti for Sunday" - Vic searches vacancies,
+ranks them and drafts a request for approval.
+Other requests Vic routes: "Is this ball out?" goes to the Rules and Umpire Assistant, "Translate
+this post" goes to Translation.
+How it works
+ Routing: Gemini reads each message, picks the intent and LangGraph runs the steps as a
+graph of tool calls
+ Tools (each is a FastAPI function) and the feature behind each: parse_vacancy (Vacancy
+Parser), search_players / search_teams (core filters), rank_candidates (4.2 AI Matcher),
+draft_invite (4.3 Invites), translate_post (4.4 Translation), ask_rules / give_ruling (4.5 Rules
+and Umpire), recommend_tournaments (4.6 Tournament Recommender), plus send_invite,
+get_profile and update_profile
+ Text (primary): a normal chat box. Every feature is usable by text alone
+ Voice (optional): a mic button in the chat. The user taps it and speaks in Tamil, English or
+Tanglish. Gemini's audio input converts the speech to text, the transcript is shown in the chat
+so the user can fix it, and from there it follows the same path as a typed message. A speaker
+button on a reply reads it aloud using text-to-speech
+ Approval rule: anything that sends a message or changes data needs a confirmation tap,
+and every tool checks team permission. Vic can only use the tools listed, so it cannot invent
+actions
+ Vic is only a chat wrapper: it calls the same core functions the app buttons call
+Tech stack
+LangGraph, Gemini API (function calling, audio input for speech-to-text, text-to-speech for
+replies), FastAPI, Pydantic, PostgreSQL, Redis (conversation state), browser audio recording
+(MediaRecorder) in the PWA
+4.2. AI Matcher (rerank + "why this player")
+Type
+Generative AI - LLM reranking with structured output, works in both directions
+
+--- PAGE 4 ---
+SquadUp AI  |  Nithish Kumar S  |  2026
+Page 4
+What it solves
+Filters can say who is eligible but not who is the best fit. The captain also will not trust a stranger
+without reasons. The matcher ranks the shortlist by weighing role fit, playing style, distance,
+availability and reliability together, and explains each ranking in one line. It handles fuzzy
+wording that filters miss, for example "strong attacker" versus "outside hitter".
+Example
+Vacancy: 2 spikers, Peelamedu, Sunday morning, friendly match. Core filters return 14 players.
+Gemini returns:
+1. Arun (score 92) - outside hitter, 3 km away, free Sunday morning, reliability 91%
+2. Karthik (score 85) - spiker, 6 km away, played 5 friendly matches
+3. Vijay (score 78) - middle blocker who can play spiker, 8 km away
+Reverse direction: a player looking for a team sees ranked teams with a reason like "needs a
+setter, 4 km away, plays on your free days".
+How it works
+ Step 1 (core): SQL and PostGIS filters produce an eligible shortlist of 10-20. Gemini never
+invents players
+ Step 2: send only the shortlisted candidates (with IDs) and the vacancy to Gemini
+ Step 3: Gemini returns a fixed JSON list of player_id, score and reason, validated by
+Pydantic
+ Step 4: the captain approves and the core notifies the top players
+ Reliability figures come from the core formula, so the explanation is always traceable to real
+records
+Tech stack
+Gemini API (structured output), PostgreSQL + PostGIS (shortlist filters), FastAPI, Pydantic
+4.3. Auto-drafted Invites and Follow-ups
+Type
+Generative AI - prompt-based generation
+What it solves
+Captains lose time writing polite messages, and players often do not reply to short or unclear
+messages. The feature writes the message for the captain, in the right language, with all details,
+and the captain only reviews and sends. It also writes the player's request message when a
+player approaches a team.
+Example
+Captain selects Arun. Draft: "Hi Arun, our team Peelamedu Warriors needs a spiker this
+Sunday, 7 AM, at Peelamedu ground (friendly match). Are you free?"
+If Arun has not replied after a day, a follow-up draft is suggested: "Just checking if you can join
+on Sunday. We can also adjust the timing."
+How it works
+ Core passes vacancy details, player name, language and tone to Gemini
+ Gemini returns a short draft in Tamil, English or Tanglish, based on the recipient's language
+ Captain edits or approves, then the core sends it via push, SMS or WhatsApp link
+ Follow-ups are triggered by a scheduled job when an invite has no reply
+Tech stack
+Gemini API, FastAPI, Celery (scheduled follow-ups), Firebase push, SMS, WhatsApp Business
+API
+4.4. Tamil - English - Tanglish Translation
+Type
+Generative AI - prompt-based translation
+What it solves
+A vacancy posted in Tamil by a village captain cannot be read by a working professional who
+reads only English, and the reverse is also true. The feature makes every post, profile and
+tournament notice readable for everybody.
+
+--- PAGE 5 ---
+SquadUp AI  |  Nithish Kumar S  |  2026
+Page 5
+Example
+A post written in Tamil script ("Sunday morning, 2 spikers needed") is shown to an English
+reader as "2 spikers needed on Sunday morning". An English tournament notice is shown to a
+Tamil reader in Tamil. Sports terms (spiker, libero, wicketkeeper) and place names are kept as
+they are.
+How it works
+ Each post is stored once in its original language
+ A Translate button (or automatic based on the user's language) calls Gemini with a sports
+glossary in the prompt
+ Translated text is cached, so each post is translated only once per language
+Tech stack
+Gemini API, FastAPI, Redis (translation cache), i18n for the fixed app UI text
+4.5. Rules and Umpire Assistant (RAG)
+Type
+Generative AI - Retrieval-Augmented Generation + scenario reasoning
+What it solves
+Rules and tournament conditions are scattered across PDFs, posters and WhatsApp messages,
+and they differ from tournament to tournament. Teams miss conditions and argue during
+matches. This feature works in two ways: it answers rule questions from the real documents,
+and in Umpire mode the user explains what happened and the assistant understands the
+scenario and gives a decision with the reason.
+Example
+Rule question: "Is a libero allowed in this tournament?" Answer: "Yes. Rule 4.2 of the
+tournament conditions allows one libero per team." (source shown).
+Umpire mode (volleyball): "Our libero set the ball with his fingers from in front of the 3-metre
+line and our spiker hit it above the net. Is that allowed?" Decision: "Not allowed - fault, point to
+the opponent." Reason: a ball set overhand by the libero in front of the attack line cannot be
+attacked above net height. Confidence: high.
+Umpire mode (cricket): "Ball pitched in line, hit the batter's pad in line with the stumps, no shot
+played, and it would have hit the stumps." Decision: "Out - LBW." If a fact is missing (for
+example "where did the ball pitch?"), it asks one question before deciding.
+How it works
+ Knowledge base: official volleyball and cricket rulebooks plus each tournament's posted
+conditions (added by the organiser as text or PDF). Documents are split into chunks and
+indexed
+ Step 1, understand: Gemini turns the user's story into a structured scenario: sport, event,
+players involved, facts found and facts missing
+ Step 2, ask if unclear: if a key fact is missing, one short question is asked
+ Step 3, retrieve: the most relevant rule chunks are fetched. Tournament conditions override
+the general rulebook, and the answer says when they do
+ Step 4, decide: Gemini reasons only from the retrieved rule text and returns a fixed JSON:
+decision, rule reference, plain explanation, confidence and an escalate flag
+ Safety: rulings are advice for friendly and local matches, and the on-field umpire's decision is
+final. With low confidence or no rule found, it says so and refers the case to the umpire or
+organiser instead of guessing
+ Works in Tamil and English, and is also reachable through Vic by text or voice
+Tech stack
+Gemini API (generation, embeddings, structured output), pgvector, FastAPI, Pydantic (scenario
+and ruling schemas), LangChain / LangGraph retriever, PDF text extraction
+4.6. Tournament Recommender
+Type
+Generative AI - prompt-based reasoning over the tournament board
+
+--- PAGE 6 ---
+SquadUp AI  |  Nithish Kumar S  |  2026
+Page 6
+What it solves
+Teams only hear about tournaments if they are in the right WhatsApp group, and many events
+have registration deadlines they miss. The recommender looks at a team's level, location and
+calendar and suggests the events that really fit.
+Example
+Team: Peelamedu Warriors, volleyball, district level, free weekends in November.
+Recommendation: "District Cup, 15-16 Nov, 12 km away, open to district-level teams,
+registration closes in 4 days. Match: high." An event for state-level teams is not shown, because
+it does not fit.
+How it works
+ Core filters tournaments by sport, district and date range
+ Gemini compares each remaining event with the team profile (level, past matches, roster size,
+free dates) and returns a fit reason and deadline flag
+ Result is shown on the tournament board and also through Vic ("Any tournaments this month
+for our team?")
+ If a team is short of players for a tournament, the agent links it to the AI Matcher (4.2) to find
+the missing players
+Tech stack
+Gemini API (structured output), PostgreSQL, FastAPI, Celery (deadline alerts)
+5. Summary
+SquadUp combines 1 Deep Learning transformer (the Tanglish Vacancy Parser) with 6 Generative AI features
+(Vic the Orchestration Agent with text and voice, AI Matcher, Auto-drafted Invites, Translation, Rules and
+Umpire Assistant, Tournament Recommender), on top of a normal, dependable core, with 0 classic ML models.
+The design is trust-first: the core holds the truth, the transformer understands Tanglish text, and Gemini ranks,
+explains and drafts. Everything is open to every player, with one account type. The pilot starts with 15-20
+personally onboarded Coimbatore teams, so the directory is never empty, before expanding to more sports and
+all of Tamil Nadu.
+SquadUp connects village and town sports teams with the players they are missing, using verified consistency
+and Tamil-first AI, so no team forfeits and no player is left without a game.
+Scope note
+Deferred to a later version: photo-based check-in verification (Vision Transformer), Team Composition
+Assistant, and Backup Player Suggester. In this version, trust comes from GPS check-in near a known
+ground, captain-confirmed attendance, two-way ratings and the reliability score.

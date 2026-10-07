@@ -1,0 +1,1 @@
+"""SquadUp backend application package."""

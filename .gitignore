@@ -1,0 +1,27 @@
+# secrets / env
+.env
+venv/
+.venv/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# ml data and model weights (Part 2)
+ml/data/
+*.pt
+*.pth
+*.bin
+*.onnx
+*.safetensors
+*.h5
+*.joblib
+*.pkl
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
